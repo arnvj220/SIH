@@ -5,8 +5,9 @@ from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 from typing import Any, Protocol
 
-BASES = ("X", "Y", "Z")
-DEFAULT_AUTH_SECRET = "luffy-zoro-sanji"
+BASES = ("X", "Y", "Z")  # Pauli measurement bases
+DEFAULT_AUTH_SECRET = "sih-26141-demo-secret"  # demo only, never a real secret
+
 
 class ThreatType(str, Enum):
     NONE = "NONE"
@@ -16,26 +17,34 @@ class ThreatType(str, Enum):
     UNAUTHORIZED_VERIFICATION = "UNAUTHORIZED_VERIFICATION"
     CHANNEL_MANIPULATION = "CHANNEL_MANIPULATION"
 
+
 class Decision(str, Enum):
     ACCEPT = "ACCEPT"
     REJECT = "REJECT"
     SUSPICIOUS = "SUSPICIOUS"
+
 
 def sha256_hex(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
 def derive_auth_fingerprint(signer_id: str, secret: str = DEFAULT_AUTH_SECRET) -> str:
-    
+    """Stand-in for a signer's authentication credential."""
     return sha256_hex(f"{signer_id}:{secret}")[:16]
+
 
 @dataclass(frozen=True)
 class MeasurementRound:
+    """One projective measurement round.
+
+    `expected` is the outcome a legitimate run should give; `observed` is what
+    the verifier actually saw. Rishi's engine will fill these from Qiskit.
+    """
 
     index: int
-    basis: str
-    expected: int
-    observed: int
+    basis: str  # "X" | "Y" | "Z"
+    expected: int  # 0 or 1
+    observed: int  # 0 or 1
 
     @property
     def is_error(self) -> bool:
@@ -90,6 +99,7 @@ class VerificationContext:
 
 @dataclass
 class DetectionOutcome:
+    """What a verifier/detector returns. Shubh's engine must return this."""
 
     decision: Decision
     threats: list[ThreatType] = field(default_factory=list)
@@ -99,13 +109,16 @@ class DetectionOutcome:
     def detected(self) -> bool:
         return self.decision != Decision.ACCEPT
 
+
 class Verifier(Protocol):
+    """Interface the attack runner needs from Shubh's verification/detection engine."""
 
     def verify(self, context: VerificationContext) -> DetectionOutcome: ...
 
 
 @dataclass
 class AttackedSample:
+    """One context to submit to the system under test, with ground truth."""
 
     context: VerificationContext
     is_attack: bool

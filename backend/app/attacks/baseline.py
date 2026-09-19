@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, Callable, Sequence
 
 import numpy as np
 
@@ -11,6 +12,31 @@ from .contracts import (
     derive_auth_fingerprint,
     sha256_hex,
 )
+
+
+# THE integration seam with Rishi's quantum engine.
+# A provider returns the measurement rounds of ONE legitimate signature:
+#     provider(rng, n_rounds, natural_error_rate) -> sequence of MeasurementRound
+# where for each round: basis in {"X","Y","Z"}, expected = the ideal outcome (0/1),
+# observed = what was actually measured (equals expected except for honest noise).
+RoundsProvider = Callable[[np.random.Generator, int, float], Sequence[MeasurementRound]]
+
+# Anything with make_legitimate() -> VerificationContext, built per (seed, rounds, noise).
+SourceFactory = Callable[[int, int, float], Any]
+
+
+def synthetic_rounds(
+    rng: np.random.Generator, n_rounds: int, natural_error_rate: float
+) -> tuple[MeasurementRound, ...]:
+    """Fake-but-plausible rounds. Stand-in until Rishi's engine is wired in."""
+    bases = rng.choice(BASES, size=n_rounds)
+    expected = rng.integers(0, 2, size=n_rounds)
+    noise = rng.random(n_rounds) < natural_error_rate
+    observed = np.where(noise, 1 - expected, expected)
+    return tuple(
+        MeasurementRound(i, str(bases[i]), int(expected[i]), int(observed[i]))
+        for i in range(n_rounds)
+    )
 
 
 @dataclass
@@ -31,10 +57,16 @@ class BaselineConfig:
 
 
 class BaselineFactory:
-    def __init__(self, config: BaselineConfig | None = None, seed: int = 0):
+    def __init__(
+        self,
+        config: BaselineConfig | None = None,
+        seed: int = 0,
+        rounds_provider: RoundsProvider | None = None,
+    ):
         self.config = config or BaselineConfig()
         self._rng = np.random.default_rng(seed)
         self._counter = 0
+        self._provider: RoundsProvider = rounds_provider or synthetic_rounds
 
     def _hex(self, nbytes: int = 6) -> str:
         return self._rng.bytes(nbytes).hex()
@@ -47,14 +79,9 @@ class BaselineFactory:
         message_id = f"msg_{self._hex()}"
         digest = sha256_hex(message_id)
 
-        bases = rng.choice(BASES, size=cfg.rounds)
-        expected = rng.integers(0, 2, size=cfg.rounds)
-        noise = rng.random(cfg.rounds) < cfg.natural_error_rate
-        observed = np.where(noise, 1 - expected, expected)
-        rounds = tuple(
-            MeasurementRound(i, str(bases[i]), int(expected[i]), int(observed[i]))
-            for i in range(cfg.rounds)
-        )
+        rounds = tuple(self._provider(rng, cfg.rounds, cfg.natural_error_rate))
+        if not rounds or not all(isinstance(m, MeasurementRound) for m in rounds):
+            raise TypeError("rounds_provider must return a non-empty sequence of MeasurementRound")
 
         issued = cfg.start_time + self._counter
         self._counter += 1
@@ -76,3 +103,7 @@ class BaselineFactory:
             protocol_version=cfg.protocol_version,
             metadata={"origin": "baseline"},
         )
+
+
+def default_source_factory(seed: int, rounds: int, natural_error_rate: float) -> BaselineFactory:
+    return BaselineFactory(BaselineConfig(rounds=rounds, natural_error_rate=natural_error_rate), seed)

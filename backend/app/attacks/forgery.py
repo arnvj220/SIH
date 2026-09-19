@@ -1,15 +1,3 @@
-"""
-Forgery attack (SRS FR-013..FR-015).
-
-Modes
------
-message_tamper   Attacker swaps the message but keeps the old signature, so the
-                 presented digest no longer matches the digest that was signed.
-signature_alter  Attacker does not know the quantum states, so a fraction of
-                 measurement outcomes are replaced by random guesses.
-                 Expected error contribution = 0.5 * modified_fraction.
-blind_guess      Attacker fabricates the whole signature (fraction = 1.0).
-"""
 from __future__ import annotations
 
 from typing import Any
@@ -26,7 +14,7 @@ class ForgeryAttack(AttackScenario):
         "measurement outcomes with guesses."
     )
     MODES = ("message_tamper", "signature_alter", "blind_guess")
-    defaults = {"mode": "signature_alter", "modified_fraction": 0.5}
+    defaults = {"mode": "signature_alter", "modified_fraction": 0.8}
 
     def validate(self, params: dict[str, Any]) -> None:
         check_choice("mode", params["mode"], self.MODES)
