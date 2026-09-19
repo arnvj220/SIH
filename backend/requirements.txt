@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+
+pydantic
+python-dotenv
+
+numpy
+scipy
+qiskit
+
+sqlalchemy
+psycopg[binary]
+alembic
+
+httpx
+pytest
+pytest-asyncio
