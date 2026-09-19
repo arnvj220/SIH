@@ -33,7 +33,7 @@ def derive_auth_fingerprint(signer_id: str, secret: str = DEFAULT_AUTH_SECRET) -
 class MeasurementRound:
 
     index: int
-    basic: str
+    basis: str
     expected: int
     observed: int
 
