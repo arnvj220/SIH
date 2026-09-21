@@ -10,6 +10,8 @@ Usage:
 
 CLI:
     python -m app.experiments.runner --iterations 100 --seed 12345
+    python -m app.experiments.runner --mode real --iterations 50
+    python -m app.experiments.runner --mode both --format markdown
 """
 
 from __future__ import annotations
@@ -20,6 +22,11 @@ import sys
 from app.experiments.benchmark import BenchmarkMetrics, run_benchmark
 from app.experiments.config import ExperimentConfig
 from app.experiments.report import to_json, to_markdown
+from app.experiments.real_benchmark import RealBenchmarkMetrics, run_real_benchmark
+from app.experiments.real_report import (
+    to_json as real_to_json,
+    to_markdown as real_to_markdown,
+)
 
 
 def run_experiment(
@@ -28,7 +35,7 @@ def run_experiment(
     seed: int = 12345,
     include_replay: bool = True,
 ) -> BenchmarkMetrics:
-    """Run a benchmark and return metrics. Thin alias for run_benchmark."""
+    """Run a synthetic benchmark. Thin alias for run_benchmark."""
     return run_benchmark(
         iterations=iterations,
         seed=seed,
@@ -38,7 +45,7 @@ def run_experiment(
 
 def run_from_config(config: ExperimentConfig) -> BenchmarkMetrics:
     """
-    Run a benchmark configured by an ExperimentConfig.
+    Run a synthetic benchmark configured by an ExperimentConfig.
 
     Recognized parameters:
         iterations (int, default 100)
@@ -51,6 +58,33 @@ def run_from_config(config: ExperimentConfig) -> BenchmarkMetrics:
         seed=config.seed,
         include_replay=include_replay,
     )
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def _emit(
+    synthetic: BenchmarkMetrics | None,
+    real: RealBenchmarkMetrics | None,
+    fmt: str,
+) -> None:
+    """Print one or both benchmarks in the requested format."""
+    chunks: list[str] = []
+
+    if synthetic is not None:
+        if fmt == "json":
+            chunks.append(to_json(synthetic))
+        else:
+            chunks.append(to_markdown(synthetic, title="Detection Benchmark (synthetic)"))
+
+    if real is not None:
+        if fmt == "json":
+            chunks.append(real_to_json(real))
+        else:
+            chunks.append(real_to_markdown(real, title="Detection Benchmark (real pipeline)"))
+
+    print("\n\n".join(chunks))
 
 
 def _cli() -> int:
@@ -71,20 +105,37 @@ def _cli() -> int:
     )
     parser.add_argument(
         "--no-replay", action="store_true",
-        help="Skip replay scenarios",
+        help="Skip replay scenarios (synthetic only)",
+    )
+    parser.add_argument(
+        "--mode", choices=("synthetic", "real", "both"),
+        default="synthetic",
+        help="Which benchmark to run (default: synthetic)",
+    )
+    parser.add_argument(
+        "--shots-per-basis", type=int, default=100,
+        help="Shots per Pauli basis for real pipeline (default: 100)",
     )
     args = parser.parse_args()
 
-    metrics = run_benchmark(
-        iterations=args.iterations,
-        seed=args.seed,
-        include_replay=not args.no_replay,
-    )
+    synthetic: BenchmarkMetrics | None = None
+    real: RealBenchmarkMetrics | None = None
 
-    if args.format == "json":
-        print(to_json(metrics))
-    else:
-        print(to_markdown(metrics, title="Detection Benchmark"))
+    if args.mode in ("synthetic", "both"):
+        synthetic = run_benchmark(
+            iterations=args.iterations,
+            seed=args.seed,
+            include_replay=not args.no_replay,
+        )
+
+    if args.mode in ("real", "both"):
+        real = run_real_benchmark(
+            iterations=args.iterations,
+            seed=args.seed,
+            shots_per_basis=args.shots_per_basis,
+        )
+
+    _emit(synthetic, real, args.format)
     return 0
 
 

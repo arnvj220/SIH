@@ -106,7 +106,8 @@ def test_verification_service_builds_context():
     assert context.message_digest == signature.message_digest
     assert context.signed_digest == signature.message_digest
     assert context.nonce == "nonce-123"
-    assert len(context.measurements) == 2
+    expected_rounds = 100 * 3  # default shots_per_basis × 3 Pauli bases
+    assert len(context.measurements) == expected_rounds
 
 
 # ---------------------------------------------------------------------------

@@ -85,11 +85,11 @@ This ordering is a correctness requirement, not an optimization.
 
 | Attack | Mechanism | Location |
 |---|---|---|
-| **Forgery** | Structural: `message_digest != signed_digest`. Statistical: `error_rate > 0.15`. | `engine.py`, `rules.py::FORGERY_ERROR_RATE_01` |
+| **Forgery** | Structural: `message_digest != signed_digest`. Statistical: `error_rate > 0.10`. | `engine.py`, `rules.py::FORGERY_ERROR_RATE_01` |
 | **Impersonation** | Structural: `signer_id != expected_signer_id`. | `engine.py` |
 | **Replay** | Stateful: `(session_id, nonce)` already consumed. | `engine.py`, `stores.py::ReplayStore` |
 | **Unauthorized verification** | Stateful: `verifier_id` not authorized for `signer_id`. | `engine.py`, `stores.py::AuthorizationStore` |
-| **Channel manipulation** | Statistical: per-basis error skew > 0.30. | `engine.py`, `rules.py::CHANNEL_DIST_SHIFT_01` |
+| **Channel manipulation** | Statistical: per-basis error skew > 0.15. | `engine.py`, `rules.py::CHANNEL_DIST_SHIFT_01` |
 
 Each attack maps to a **distinct detection signal**. This is what
 distinguishes the platform from a generic anomaly detector — the
@@ -108,7 +108,7 @@ Rule(
     threat_type=ThreatType.CHANNEL_MANIPULATION,
     metric="distribution_shift",
     operator=RuleOperator.GT,
-    threshold=0.30,
+    threshold=0.35,
     severity=Severity.HIGH,
     explanation_template=(
         "Per-basis error skew {observed:.3f} exceeded "

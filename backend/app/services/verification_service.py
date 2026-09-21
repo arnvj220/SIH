@@ -9,9 +9,14 @@ from ..attacks.contracts import (
     derive_auth_fingerprint,
 )
 
+from app.detection.measurement_builder import BuilderConfig, build_measurements
+
 
 class VerificationService:
     """Builds verification contexts from QDS signatures."""
+
+    def __init__(self, *, shots_per_basis: int = 100) -> None:
+        self._shots_per_basis = shots_per_basis
 
     def build_context(
         self,
@@ -30,10 +35,19 @@ class VerificationService:
 
         message_digest = compute_message_digest(message)
 
-        # The current simulator does not yet expose signed
-        # measurement rounds directly, so derive the verification
-        # measurement from the teleportation evidence.
-        measurements = self._build_measurements(evidence)
+        # Build measurement rounds by sampling:
+        #   - expected from Alice's original input state
+        #   - observed from Bob's state after teleportation + correction
+        # Under legitimate teleportation these agree statistically;
+        # under attack they diverge. See
+        # app/detection/measurement_builder.py for details.
+        measurements = build_measurements(
+            evidence,
+            BuilderConfig(
+                shots_per_basis=self._shots_per_basis,
+                seed=evidence.seed,
+            ),
+        )
 
         issued_at = time.time()
         received = received_at if received_at is not None else issued_at
@@ -62,19 +76,3 @@ class VerificationService:
             protocol_version=signature.protocol_version,
             metadata=metadata or {},
         )
-
-    @staticmethod
-    def _build_measurements(evidence):
-        from ..attacks.contracts import MeasurementRound
-
-        bits = evidence.measurement_bits
-
-        return tuple(
-            MeasurementRound(
-                index=index,
-                basis="Z",
-                expected=int(bit),
-                observed=int(bit),
-            )
-            for index, bit in enumerate(bits)
-        )                                                                                           

@@ -54,13 +54,26 @@ class Rule:
 # Note: REPLAY, IMPERSONATION, and UNAUTHORIZED_VERIFICATION checks are
 # implemented structurally in engine.py, not as rules in this file.
 
+# Thresholds calibrated against the real quantum noise floor
+# (see backend/scripts/check_sampling.py):
+#   - legitimate error_rate ≈ 0.02
+#   - legitimate per-basis skew ≈ 0.04
+# Forgery threshold set to 5× noise floor; channel threshold set
+# to 2.5× legit skew. Recalibrate if shots_per_basis changes
+# (noise scales as 1/√shots).
+
+# Threshold calibrated against 100-shot per-basis sampling noise.
+# Legit skew typically ≈ 0.05; threshold at 0.15 gives 3× margin.
+# Increasing shots_per_basis would lower the noise floor and could
+# permit a lower threshold. See docs/architecture.md §9.
+
 DEFAULT_RULES: tuple[Rule, ...] = (
     Rule(
         rule_id="FORGERY_ERROR_RATE_01",
         threat_type=ThreatType.FORGERY,
         metric="error_rate",
         operator=RuleOperator.GT,
-        threshold=0.15,
+        threshold=0.10, # was 0.15 — calibrated against real 2% noise floor
         severity=Severity.HIGH,
         explanation_template=(
             "Round error rate {observed:.3f} exceeded "
@@ -78,7 +91,9 @@ DEFAULT_RULES: tuple[Rule, ...] = (
         threat_type=ThreatType.CHANNEL_MANIPULATION,
         metric="distribution_shift",
         operator=RuleOperator.GT,
-        threshold=0.3,
+        # was 0.30, now 0.10 — calibrated against real 4% skew noise
+        # was 0.10, now 0.15 — calibrated against 100-shot noise floor
+        threshold=0.15,  
         severity=Severity.HIGH,
         explanation_template=(
             "Outcome distribution shift {observed:.3f} exceeded "
