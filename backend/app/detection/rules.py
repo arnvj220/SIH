@@ -67,12 +67,18 @@ DEFAULT_RULES: tuple[Rule, ...] = (
             "forgery threshold {threshold:.3f}"
         ),
     ),
+
+    # Note: distribution_shift currently equals error_rate, so this rule
+    # partially overlaps with FORGERY_ERROR_RATE_01. Threshold 0.30 is
+    # above the expected quantum-noise floor (~15%) but below a level
+    # that would miss moderate channel tampering. Will be revised when
+    # per-basis statistics are available from the quantum engine.
     Rule(
         rule_id="CHANNEL_DIST_SHIFT_01",
         threat_type=ThreatType.CHANNEL_MANIPULATION,
         metric="distribution_shift",
         operator=RuleOperator.GT,
-        threshold=0.5,
+        threshold=0.3,
         severity=Severity.HIGH,
         explanation_template=(
             "Outcome distribution shift {observed:.3f} exceeded "
