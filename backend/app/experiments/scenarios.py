@@ -43,15 +43,33 @@ def _clean_measurements(
 
 
 def _noisy_measurements(
-    rng: random.Random, rounds: int = 20, error_rate: float = 0.5
+    rng: random.Random,
+    rounds: int = 21,                    # ← multiple of 3 for even distribution
+    error_rate: float = 0.6,
+    target_basis: str = "Z",
 ) -> tuple[MeasurementRound, ...]:
-    """Tampered: each round flips with probability error_rate."""
+    """
+    Channel-manipulation attack: corrupt exactly error_rate fraction
+    of the rounds measured in the target basis. Other bases stay clean.
+
+    Uses rounds that is a multiple of 3 so each basis gets an equal share.
+    """
+    bases = ["X", "Y", "Z"]
+
+    # Which rounds belong to the target basis?
+    target_indices = [i for i in range(rounds) if bases[i % 3] == target_basis]
+
+    # Choose exactly N of them to flip
+    n_flip = int(round(len(target_indices) * error_rate))
+    flip_set = set(rng.sample(target_indices, n_flip))
+
     out: list[MeasurementRound] = []
     for i in range(rounds):
+        basis = bases[i % 3]
         bit = rng.randint(0, 1)
-        observed = bit if rng.random() > error_rate else 1 - bit
+        observed = (1 - bit) if i in flip_set else bit
         out.append(
-            MeasurementRound(index=i, basis="Z", expected=bit, observed=observed)
+            MeasurementRound(index=i, basis=basis, expected=bit, observed=observed)
         )
     return tuple(out)
 

@@ -34,8 +34,17 @@ class BenchmarkMetrics:
     false_negatives: int = 0
     true_positives: int = 0
     true_negatives: int = 0
+
+    classified_correctly: int = 0
+    classified_wrongly: int = 0
+
     latencies_ms: list[float] = field(default_factory=list)
     per_attack: dict[str, dict] = field(default_factory=dict)
+
+    @property
+    def classification_accuracy(self) -> float:
+        denom = self.classified_correctly + self.classified_wrongly
+        return self.classified_correctly / denom if denom else 0.0
 
     @property
     def accuracy(self) -> float:
@@ -69,26 +78,27 @@ class BenchmarkMetrics:
         return sorted_lat[idx]
 
 
-def _evaluate(
-    metrics: BenchmarkMetrics,
-    scenario: Scenario,
-    outcome_decision: Decision,
-    threats: list[ThreatType],
-) -> None:
-    """Update metrics based on one scenario result."""
+def _evaluate(metrics, scenario, outcome_decision, threats):
     flagged = outcome_decision != Decision.ACCEPT
     is_attack = scenario.is_attack
+    correct_threat = scenario.expected_threat in threats
 
-    if is_attack and flagged:
+    if is_attack and flagged and correct_threat:
         metrics.true_positives += 1
         metrics.correct += 1
+        metrics.classified_correctly += 1
+    elif is_attack and flagged:
+        metrics.true_positives += 1
+        metrics.classified_wrongly += 1
     elif is_attack and not flagged:
         metrics.false_negatives += 1
+        metrics.classified_wrongly += 1
     elif not is_attack and flagged:
         metrics.false_positives += 1
     else:
         metrics.true_negatives += 1
         metrics.correct += 1
+        metrics.classified_correctly += 1
 
     name = scenario.name
     metrics.per_attack.setdefault(

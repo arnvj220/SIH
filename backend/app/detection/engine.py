@@ -11,6 +11,7 @@ from __future__ import annotations
 from app.attacks.contracts import (
     Decision,
     DetectionOutcome,
+    MeasurementRound,
     ThreatType,
     VerificationContext,
 )
@@ -165,20 +166,32 @@ class DetectionEngine:
         )
 
     def _extract_metrics(self, context: VerificationContext) -> dict[str, float]:
-        """Turn a VerificationContext into a flat metric dict for rules."""
-        measurements = context.measurements
+        """
+        Compute rule metrics from the verification context.
 
-        # error_rate: fraction of rounds where observed != expected
-        error_rate = context.error_rate
+        - error_rate: overall fraction of rounds where observed != expected
+        - distribution_shift: max per-basis error rate minus min per-basis
+        error rate. High value = one basis is much worse than others
+        (channel attack). Low value = errors evenly distributed
+        (forgery or noise).
+        """
+        by_basis: dict[str, list[MeasurementRound]] = {}
+        for m in context.measurements:
+            by_basis.setdefault(m.basis, []).append(m)
 
-        # distribution_shift: fraction of rounds where observed is
-        # anti-correlated with expected. For a perfect flip channel this
-        # equals error_rate; for a biased channel it may differ.
-        # Currently identical to error_rate until the quantum engine
-        # exposes richer per-basis statistics.
-        distribution_shift = error_rate
+        per_basis_error: dict[str, float] = {}
+        for basis, rounds in by_basis.items():
+            if rounds:
+                per_basis_error[basis] = sum(
+                    1 for r in rounds if r.is_error
+                ) / len(rounds)
+
+        if per_basis_error:
+            skew = max(per_basis_error.values()) - min(per_basis_error.values())
+        else:
+            skew = 0.0
 
         return {
-            "error_rate": error_rate,
-            "distribution_shift": distribution_shift,
+            "error_rate": context.error_rate,
+            "distribution_shift": skew,
         }

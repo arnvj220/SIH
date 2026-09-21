@@ -23,6 +23,7 @@ def to_markdown(metrics: BenchmarkMetrics, *, title: str = "Benchmark") -> str:
     lines.append(f"| Total samples | {metrics.total} |")
     lines.append(f"| Correct decisions | {metrics.correct} |")
     lines.append(f"| Accuracy | {metrics.accuracy:.4f} |")
+    lines.append(f"| Classification Accuracy | {metrics.classification_accuracy:.4f} |")
     lines.append(f"| True positives | {metrics.true_positives} |")
     lines.append(f"| True negatives | {metrics.true_negatives} |")
     lines.append(f"| False positives | {metrics.false_positives} |")
