@@ -11,9 +11,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from app.models.domain.verification import Severity, ThreatType
+from app.attacks.contracts import ThreatType
 from app.detection.thresholds import crosses
 
+
+class Severity(str, Enum):
+    INFO = "INFO"
+    SUSPICIOUS = "SUSPICIOUS"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
 
 class RuleOperator(str, Enum):
     GT = ">"
@@ -37,7 +43,7 @@ class Rule:
     explanation_template: str
 
     def triggers(self, observed: float) -> bool:
-        crosses(self.metric, self.operator.value, self.threshold)
+        return crosses(observed, self.operator.value, self.threshold)
 
     def explain(self, observed: float, expected: float) -> str:
         """Render the explanation with the actual values."""
@@ -48,9 +54,9 @@ class Rule:
 
 DEFAULT_RULES: tuple[Rule, ...] = (
     Rule(
-        rule_id="FORGERY_DEVIATION_01",
+        rule_id="FORGERY_ERROR_RATE_01",
         threat_type=ThreatType.FORGERY,
-        metric="measurement_deviation",
+        metric="error_rate",
         operator=RuleOperator.GT,
         threshold=0.15,
         severity=Severity.HIGH,
@@ -64,7 +70,7 @@ DEFAULT_RULES: tuple[Rule, ...] = (
         threat_type=ThreatType.CHANNEL_MANIPULATION,
         metric="distribution_shift",
         operator=RuleOperator.GT,
-        threshold=0.10,
+        threshold=0.25,
         severity=Severity.HIGH,
         explanation_template=(
             "Outcome distribution shift {observed:.3f} exceeded "
