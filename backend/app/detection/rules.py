@@ -72,7 +72,7 @@ DEFAULT_RULES: tuple[Rule, ...] = (
         threat_type=ThreatType.CHANNEL_MANIPULATION,
         metric="distribution_shift",
         operator=RuleOperator.GT,
-        threshold=0.25,
+        threshold=0.5,
         severity=Severity.HIGH,
         explanation_template=(
             "Outcome distribution shift {observed:.3f} exceeded "

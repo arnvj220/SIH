@@ -166,14 +166,19 @@ class DetectionEngine:
 
     def _extract_metrics(self, context: VerificationContext) -> dict[str, float]:
         """Turn a VerificationContext into a flat metric dict for rules."""
-        observed_outcomes = [m.observed for m in context.measurements]
-        expected_p0 = self.baseline.expected_p0("Z")
-        deviation = measurement_deviation(
-            observed_outcomes=observed_outcomes,
-            expected_p0=expected_p0,
-        )
+        measurements = context.measurements
+
+        # error_rate: fraction of rounds where observed != expected
+        error_rate = context.error_rate
+
+        # distribution_shift: fraction of rounds where observed is
+        # anti-correlated with expected. For a perfect flip channel this
+        # equals error_rate; for a biased channel it may differ.
+        # Currently identical to error_rate until the quantum engine
+        # exposes richer per-basis statistics.
+        distribution_shift = error_rate
+
         return {
-            "error_rate": context.error_rate,
-            "measurement_deviation": deviation,
-            "distribution_shift": deviation,
+            "error_rate": error_rate,
+            "distribution_shift": distribution_shift,
         }
