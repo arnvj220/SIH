@@ -1,0 +1,101 @@
+"""
+Deterministic detection rules.
+
+A rule maps a measured metric to a threat decision using a
+configurable threshold. Rules are data — not code — so they can be
+inspected, exported, and calibrated without changing the engine.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+
+from app.models.domain.verification import Severity, ThreatType
+from app.detection.thresholds import crosses
+
+
+class RuleOperator(str, Enum):
+    GT = ">"
+    GE = ">="
+    LT = "<"
+    LE = "<="
+    EQ = "=="
+    NE = "!="
+
+
+@dataclass(frozen=True)
+class Rule:
+    """A single deterministic detection rule."""
+
+    rule_id: str
+    threat_type: ThreatType
+    metric: str
+    operator: RuleOperator
+    threshold: float
+    severity: Severity
+    explanation_template: str
+
+    def triggers(self, observed: float) -> bool:
+        crosses(self.metric, self.operator.value, self.threshold)
+
+    def explain(self, observed: float, expected: float) -> str:
+        """Render the explanation with the actual values."""
+        return self.explanation_template.format(
+            observed=observed, expected=expected, threshold=self.threshold
+        )
+
+
+DEFAULT_RULES: tuple[Rule, ...] = (
+    Rule(
+        rule_id="FORGERY_DEVIATION_01",
+        threat_type=ThreatType.FORGERY,
+        metric="measurement_deviation",
+        operator=RuleOperator.GT,
+        threshold=0.15,
+        severity=Severity.HIGH,
+        explanation_template=(
+            "Measurement deviation {observed:.3f} exceeded "
+            "forgery threshold {threshold:.3f}"
+        ),
+    ),
+    Rule(
+        rule_id="CHANNEL_DIST_SHIFT_01",
+        threat_type=ThreatType.CHANNEL_MANIPULATION,
+        metric="distribution_shift",
+        operator=RuleOperator.GT,
+        threshold=0.10,
+        severity=Severity.HIGH,
+        explanation_template=(
+            "Outcome distribution shift {observed:.3f} exceeded "
+            "channel threshold {threshold:.3f}"
+        ),
+    ),
+    Rule(
+        rule_id="REPLAY_SESSION_REUSE_01",
+        threat_type=ThreatType.REPLAY,
+        metric="session_reuse_count",
+        operator=RuleOperator.GT,
+        threshold=0.0,
+        severity=Severity.HIGH,
+        explanation_template="Session reused {observed:.0f} time(s)",
+    ),
+    Rule(
+        rule_id="IMPERSONATION_ID_MISMATCH_01",
+        threat_type=ThreatType.IMPERSONATION,
+        metric="identity_mismatch",
+        operator=RuleOperator.GT,
+        threshold=0.0,
+        severity=Severity.HIGH,
+        explanation_template="Identity mismatch detected",
+    ),
+    Rule(
+        rule_id="UNAUTHORIZED_VERIFIER_01",
+        threat_type=ThreatType.UNAUTHORIZED_VERIFICATION,
+        metric="unauthorized_attempt",
+        operator=RuleOperator.GT,
+        threshold=0.0,
+        severity=Severity.HIGH,
+        explanation_template="Verifier not authorized for this signature",
+    ),
+)
