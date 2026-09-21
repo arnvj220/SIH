@@ -51,6 +51,8 @@ class Rule:
             observed=observed, expected=expected, threshold=self.threshold
         )
 
+# Note: REPLAY, IMPERSONATION, and UNAUTHORIZED_VERIFICATION checks are
+# implemented structurally in engine.py, not as rules in this file.
 
 DEFAULT_RULES: tuple[Rule, ...] = (
     Rule(
@@ -61,7 +63,7 @@ DEFAULT_RULES: tuple[Rule, ...] = (
         threshold=0.15,
         severity=Severity.HIGH,
         explanation_template=(
-            "Measurement deviation {observed:.3f} exceeded "
+            "Round error rate {observed:.3f} exceeded "
             "forgery threshold {threshold:.3f}"
         ),
     ),
@@ -76,32 +78,5 @@ DEFAULT_RULES: tuple[Rule, ...] = (
             "Outcome distribution shift {observed:.3f} exceeded "
             "channel threshold {threshold:.3f}"
         ),
-    ),
-    Rule(
-        rule_id="REPLAY_SESSION_REUSE_01",
-        threat_type=ThreatType.REPLAY,
-        metric="session_reuse_count",
-        operator=RuleOperator.GT,
-        threshold=0.0,
-        severity=Severity.HIGH,
-        explanation_template="Session reused {observed:.0f} time(s)",
-    ),
-    Rule(
-        rule_id="IMPERSONATION_ID_MISMATCH_01",
-        threat_type=ThreatType.IMPERSONATION,
-        metric="identity_mismatch",
-        operator=RuleOperator.GT,
-        threshold=0.0,
-        severity=Severity.HIGH,
-        explanation_template="Identity mismatch detected",
-    ),
-    Rule(
-        rule_id="UNAUTHORIZED_VERIFIER_01",
-        threat_type=ThreatType.UNAUTHORIZED_VERIFICATION,
-        metric="unauthorized_attempt",
-        operator=RuleOperator.GT,
-        threshold=0.0,
-        severity=Severity.HIGH,
-        explanation_template="Verifier not authorized for this signature",
     ),
 )

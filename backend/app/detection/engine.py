@@ -18,6 +18,12 @@ from app.detection.baseline import BaselineProfile, DEFAULT_BASELINE
 from app.detection.evidence import make_evidence
 from app.detection.rules import DEFAULT_RULES, Rule
 from app.detection.statistics import measurement_deviation
+from app.detection.stores import (
+    AuthorizationStore,
+    ReplayStore,
+    DEFAULT_AUTHORIZATION_STORE,
+    DEFAULT_REPLAY_STORE,
+)
 
 
 class DetectionEngine:
@@ -31,9 +37,15 @@ class DetectionEngine:
         self,
         rules: tuple[Rule, ...] = DEFAULT_RULES,
         baseline: BaselineProfile = DEFAULT_BASELINE,
+        replay_store: ReplayStore | None = None,
+        authorization_store: AuthorizationStore | None = None,
     ) -> None:
         self.rules = rules
         self.baseline = baseline
+        self.replay_store = replay_store or DEFAULT_REPLAY_STORE
+        self.authorization_store = (
+            authorization_store or DEFAULT_AUTHORIZATION_STORE
+        )
 
     def verify(self, context: VerificationContext) -> DetectionOutcome:
         """Run all applicable rules against the context."""
@@ -41,7 +53,9 @@ class DetectionEngine:
         threats: list[ThreatType] = []
         evidence: list[dict] = []
 
-        # 1. Identity / authorization checks (structural, not statistical)
+        # --- Structural checks (no state) ---
+
+        # 1. Impersonation: presenter claims one signer, session expects another.
         if context.signer_id != context.expected_signer_id:
             threats.append(ThreatType.IMPERSONATION)
             evidence.append(
@@ -51,13 +65,13 @@ class DetectionEngine:
                     threshold=context.expected_signer_id,
                     rule_id="IMPERSONATION_ID_MISMATCH_01",
                     explanation=(
-                        f"Presented signer {context.signer_id!r} does not match "
-                        f"expected {context.expected_signer_id!r}"
+                        f"Presented signer {context.signer_id!r} does not "
+                        f"match expected {context.expected_signer_id!r}"
                     ),
                 )
             )
 
-        # 2. Message integrity (forgery)
+        # 2. Forgery: presented message digest differs from signed digest.
         if context.message_digest != context.signed_digest:
             threats.append(ThreatType.FORGERY)
             evidence.append(
@@ -66,11 +80,32 @@ class DetectionEngine:
                     observed=context.message_digest,
                     threshold=context.signed_digest,
                     rule_id="FORGERY_DIGEST_MISMATCH_01",
-                    explanation="Presented message digest does not match signed digest",
+                    explanation=(
+                        "Presented message digest does not match signed digest"
+                    ),
                 )
             )
 
-        # 3. Statistical rules (channel manipulation, measurement deviation)
+        # 3. Unauthorized verification: verifier not permitted for signer.
+        if not self.authorization_store.is_authorized(
+            context.signer_id, context.verifier_id
+        ):
+            threats.append(ThreatType.UNAUTHORIZED_VERIFICATION)
+            evidence.append(
+                make_evidence(
+                    evidence_type="unauthorized_verifier",
+                    observed=context.verifier_id,
+                    threshold=context.signer_id,
+                    rule_id="UNAUTHORIZED_VERIFIER_01",
+                    explanation=(
+                        f"Verifier {context.verifier_id!r} is not authorized "
+                        f"to verify signatures for {context.signer_id!r}"
+                    ),
+                )
+            )
+
+        # --- Statistical rules (rule-based, no state) ---
+
         for rule in self.rules:
             observed = metrics.get(rule.metric)
             if observed is None:
@@ -87,6 +122,35 @@ class DetectionEngine:
                     )
                 )
 
+        # --- Stateful checks (only if no other threats found) ---
+
+        # 4. Replay: a clean-looking context that reuses a consumed (session, nonce)
+        #    is a replay. We check this last so that an attacker cannot "burn"
+        #    a legitimate session by submitting an obviously-fake request first.
+        if not threats:
+            consumed = self.replay_store.consume_or_flag(
+                context.session_id, context.nonce
+            )
+            if not consumed:
+                threats.append(ThreatType.REPLAY)
+                evidence.append(
+                    make_evidence(
+                        evidence_type="session_reuse",
+                        observed=1.0,
+                        threshold=0.0,
+                        rule_id="REPLAY_SESSION_REUSE_01",
+                        explanation=(
+                            f"Session {context.session_id!r} with nonce "
+                            f"{context.nonce!r} was already consumed"
+                        ),
+                    )
+                )
+        else:
+            # If the context already has threats, do not consume the
+            # (session, nonce). This preserves the session for legitimate use.
+            # An attacker's tampered request should not lock out the real one.
+            pass
+
         if threats:
             return DetectionOutcome(
                 decision=Decision.REJECT,
@@ -101,18 +165,15 @@ class DetectionEngine:
         )
 
     def _extract_metrics(self, context: VerificationContext) -> dict[str, float]:
+        """Turn a VerificationContext into a flat metric dict for rules."""
         observed_outcomes = [m.observed for m in context.measurements]
-        metrics: dict[str, float] = {
+        expected_p0 = self.baseline.expected_p0("Z")
+        deviation = measurement_deviation(
+            observed_outcomes=observed_outcomes,
+            expected_p0=expected_p0,
+        )
+        return {
             "error_rate": context.error_rate,
-            "measurement_deviation": measurement_deviation(
-                observed_outcomes=observed_outcomes,
-                expected_p0=self.baseline.expected_p0("Z"),
-            ),
-            # distribution_shift: same TV metric, but its rule uses a different
-            # threat_type and threshold, letting the two rules coexist.
-            "distribution_shift": measurement_deviation(
-                observed_outcomes=observed_outcomes,
-                expected_p0=self.baseline.expected_p0("Z"),
-            ),
+            "measurement_deviation": deviation,
+            "distribution_shift": deviation,
         }
-        return metrics
