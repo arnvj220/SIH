@@ -208,36 +208,13 @@ def test_verification_rejects_high_measurement_error():
             "received_at": 1700000001.0,
             "auth_fingerprint": "fingerprint",
             "measurements": [
-                {
-                    "index": 0,
-                    "basis": "Z",
-                    "expected": 0,
-                    "observed": 1,
-                },
-                {
-                    "index": 1,
-                    "basis": "X",
-                    "expected": 0,
-                    "observed": 1,
-                },
-                {
-                    "index": 2,
-                    "basis": "Y",
-                    "expected": 1,
-                    "observed": 0,
-                },
-                {
-                    "index": 3,
-                    "basis": "Z",
-                    "expected": 1,
-                    "observed": 0,
-                },
-                {
-                    "index": 4,
-                    "basis": "X",
-                    "expected": 0,
-                    "observed": 1,
-                },
+                {"index": 0, "basis": "Z", "expected": 0, "observed": 1},   # flipped
+                {"index": 1, "basis": "Z", "expected": 1, "observed": 0},   # flipped
+                {"index": 2, "basis": "Z", "expected": 0, "observed": 1},   # flipped
+                {"index": 3, "basis": "X", "expected": 0, "observed": 0},   # clean
+                {"index": 4, "basis": "X", "expected": 1, "observed": 1},   # clean
+                {"index": 5, "basis": "Y", "expected": 0, "observed": 0},   # clean
+                {"index": 6, "basis": "Y", "expected": 1, "observed": 1},   # clean
             ],
         },
     )
@@ -249,4 +226,4 @@ def test_verification_rejects_high_measurement_error():
     assert data["decision"] == "REJECT"
     assert data["detected"] is True
     assert "CHANNEL_MANIPULATION" in data["threats"]
-    assert data["error_rate"] == 1.0
+    assert abs(data["error_rate"] - (3 / 7)) < 1e-9
