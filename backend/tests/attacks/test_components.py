@@ -1,11 +1,13 @@
 """
 Status board: which parts of the project are present and importable?
 
-Run with -v:   python -m pytest tests/test_00_component_status.py -v -rs
+Run with -v:   python -m pytest tests/attacks/test_components.py -v -rs
   PASSED  = present and working
   SKIPPED = not in your checkout yet (the reason is printed), NOT a failure
 
 The REQUIRED group is the attack engine (Arnav's scope) and must always pass.
+The OPTIONAL group probes teammates' components at their real module paths so
+the board tells the truth about what is actually merged.
 """
 import importlib
 import importlib.util
@@ -63,7 +65,11 @@ class RequiredAttackEngine(unittest.TestCase):
 
 
 class OptionalComponents(unittest.TestCase):
-    """Skipped (not failed) when a teammate's part is not merged yet."""
+    """
+    Skipped (not failed) when a teammate's part is not on the path.
+
+    Probing real module paths so the status board reflects what is merged.
+    """
 
     def _need(self, module: str, owner: str):
         m, why = _try(module)
@@ -72,30 +78,71 @@ class OptionalComponents(unittest.TestCase):
         return m
 
     def test_detection_engine(self):
+        """Shubh's detection engine: app/detection/engine.py."""
         m = self._need("app.detection", "Shubh")
-
-        if not hasattr(m, "DetectionConfig") or not hasattr(m, "VerificationEngine"):
-            self.skipTest("detection engine is present but not complete yet (Shubh)")
-
+        # Real exports: DetectionEngine, DEFAULT_RULES, ReplayStore,
+        # AuthorizationStore, BaselineProfile.
         self.assertTrue(
-            hasattr(m, "DetectionConfig")
-            and hasattr(m, "VerificationEngine")
+            hasattr(m, "DetectionEngine"),
+            "app.detection must export DetectionEngine",
         )
 
-    def test_benchmarking(self):
-        self._need("app.benchmarking", "Shubh")
+    def test_detection_stores(self):
+        m = self._need("app.detection.stores", "Shubh")
+        self.assertTrue(hasattr(m, "ReplayStore"))
+        self.assertTrue(hasattr(m, "AuthorizationStore"))
+
+    def test_experiments_package(self):
+        """Shubh's benchmarking lives at app/experiments, not app/benchmarking."""
+        m = self._need("app.experiments", "Shubh")
+
+    def test_benchmark_runner(self):
+        m = self._need("app.experiments.benchmark", "Shubh")
+        self.assertTrue(hasattr(m, "run_benchmark"))
+        self.assertTrue(hasattr(m, "BenchmarkMetrics"))
+
+    def test_real_benchmark_runner(self):
+        m = self._need("app.experiments.real_benchmark", "Shubh")
+        self.assertTrue(hasattr(m, "run_real_benchmark"))
 
     def test_scenarios(self):
-        self._need("app.attacks.scenarios", "Arnav, newer zip")
+        """Scenario builders live at app/experiments/scenarios.py."""
+        m = self._need("app.experiments.scenarios", "Shubh / attack integration")
+        for name in (
+            "legit_scenario",
+            "forgery_scenario",
+            "impersonation_scenario",
+            "channel_manipulation_scenario",
+            "unauthorized_scenario",
+        ):
+            self.assertTrue(hasattr(m, name), f"scenarios missing {name}")
 
     def test_quantum_adapter(self):
-        self._need("app.attacks.quantum_adapter", "Arnav, newer zip")
+        self._need("app.attacks.quantum_adapter", "Arnav")
+
+    def test_verifier_adapter_is_wired(self):
+        """
+        Verifies the integration seam is live: real_verifier_factory must
+        return a DetectionEngine rather than raising NotImplementedError.
+        """
+        m = self._need("app.attacks.verifier_adapter", "Arnav")
+        try:
+            verifier = m.real_verifier_factory()
+        except NotImplementedError:
+            self.fail(
+                "real_verifier_factory still raises NotImplementedError - "
+                "the detection engine is present but the adapter is not wired"
+            )
+        except ImportError as exc:
+            self.skipTest(f"detection engine not on path yet (Shubh): {exc}")
+        self.assertTrue(hasattr(verifier, "verify"))
 
     def test_fastapi_installed(self):
         self._need("fastapi", "pip install -r requirements.txt")
 
     def test_api_router(self):
-        self._need("app.api.attacks_router", "needs fastapi + benchmarking")
+        """Attacks router lives at app/api/attacks.py."""
+        self._need("app.api.attacks", "Rachit")
 
     def test_rishi_quantum_package_is_importable(self):
         spec = None

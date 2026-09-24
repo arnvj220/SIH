@@ -18,15 +18,10 @@ from .contracts import (
     Verifier,
 )
 from .registry import ATTACK_REGISTRY, create_attack
+from .verifier_adapter import real_verifier_factory
 
 VerifierFactory = Callable[[], Verifier]
 
-
-def default_verifier_factory() -> Verifier:
-    """Real verification + statistical detection engine (lazy import avoids a cycle)."""
-    from app.detection import VerificationEngine
-
-    return VerificationEngine()
 
 
 @dataclass
@@ -162,7 +157,7 @@ def run_attack_experiment(
     source_factory: SourceFactory | None = None,
 ) -> AttackReport:
     config.validate()
-    make_verifier: VerifierFactory = verifier_factory or default_verifier_factory
+    make_verifier: VerifierFactory = verifier_factory or real_verifier_factory
 
     seeds = [int(s.generate_state(1)[0]) for s in np.random.SeedSequence(config.seed).spawn(3)]
     base_seed, attack_seed, control_seed = seeds
