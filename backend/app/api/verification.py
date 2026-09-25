@@ -1,34 +1,32 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from ..attacks.contracts import MeasurementRound, VerificationContext
+from ..db.session import get_db
 from ..models.schemas.verification import (
     VerificationRequest,
     VerificationResponse,
 )
+from ..services.alert_service import persist_verification_and_alerts
 from ..services.detection_service import DetectionService
 
 
-router = APIRouter(
-    prefix="/verification",
-    tags=["verification"],
-)
+router = APIRouter(prefix="/verification", tags=["verification"])
 
 detection_service = DetectionService()
 
 
-def _build_context(
-    request: VerificationRequest,
-) -> VerificationContext:
+def _build_context(request: VerificationRequest) -> VerificationContext:
     measurements = tuple(
         MeasurementRound(
-            index=measurement.index,
-            basis=measurement.basis,
-            expected=measurement.expected,
-            observed=measurement.observed,
+            index=m.index,
+            basis=m.basis,
+            expected=m.expected,
+            observed=m.observed,
         )
-        for measurement in request.measurements
+        for m in request.measurements
     )
 
     return VerificationContext(
@@ -51,16 +49,19 @@ def _build_context(
     )
 
 
-@router.post(
-    "",
-    response_model=VerificationResponse,
-)
+@router.post("", response_model=VerificationResponse)
 def verify_signature(
     request: VerificationRequest,
+    db: Session = Depends(get_db),
 ) -> VerificationResponse:
     context = _build_context(request)
-
     outcome = detection_service.detect(context)
+
+    try:
+        persist_verification_and_alerts(db, context, outcome)
+    except Exception as exc:
+        # Never let persistence failure hide the security decision.
+        print(f"[verification] persist failed: {exc}")
 
     return VerificationResponse(
         verification_id=request.verification_id,

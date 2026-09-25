@@ -10,7 +10,7 @@ client = TestClient(app)
 
 def test_create_signature():
     response = client.post(
-        "/signatures",
+        "/api/signatures",
         json={
             "signature_id": "sig_api_1",
             "signer_id": "usr_alice",
@@ -54,7 +54,7 @@ def test_create_signature():
 
 def test_create_signature_rejects_invalid_measurement_state():
     response = client.post(
-        "/signatures",
+        "/api/signatures",
         json={
             "signature_id": "sig_invalid",
             "signer_id": "usr_alice",
@@ -73,7 +73,7 @@ def test_create_signature_rejects_invalid_measurement_state():
 
 def test_verification_accepts_valid_context():
     response = client.post(
-        "/verification",
+        "/api/verification",
         json={
             "verification_id": "verify_api_1",
             "signature_id": "sig_api_1",
@@ -118,7 +118,7 @@ def test_verification_accepts_valid_context():
 
 def test_verification_rejects_impersonation():
     response = client.post(
-        "/verification",
+        "/api/verification",
         json={
             "verification_id": "verify_impersonation",
             "signature_id": "sig_impersonation",
@@ -155,7 +155,7 @@ def test_verification_rejects_impersonation():
 
 def test_verification_rejects_message_tampering():
     response = client.post(
-        "/verification",
+        "/api/verification",
         json={
             "verification_id": "verify_forgery",
             "signature_id": "sig_forgery",
@@ -192,7 +192,7 @@ def test_verification_rejects_message_tampering():
 
 def test_verification_rejects_high_measurement_error():
     response = client.post(
-        "/verification",
+        "/api/verification",
         json={
             "verification_id": "verify_channel",
             "signature_id": "sig_channel",
