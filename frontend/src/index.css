@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Quantum Eclipse (dark, default) ────────────────────────────────── */
+:root,
+.dark {
+  --color-bg:      9 8 23;        /* #090817 */
+  --color-surface: 21 17 42;      /* #15112A */
+  --color-primary: 217 70 239;    /* #D946EF */
+  --color-secondary: 56 189 248;  /* #38BDF8 */
+  --color-accent:  163 230 53;    /* #A3E635 */
+  --color-text:    245 243 255;   /* #F5F3FF */
+  --color-muted:   165 160 184;   /* #A5A0B8 */
+  --color-border:  48 40 74;      /* #30284A */
+  --color-success: 63 166 107;    /* #3FA66B */
+  --color-warning: 217 145 37;    /* #D99125 */
+  --color-danger:  201 74 74;     /* #C94A4A */
+}
+
+/* ── Quantum Ivory (light) ──────────────────────────────────────────── */
+.light {
+  --color-bg:      246 241 232;   /* #F6F1E8 */
+  --color-surface: 255 253 247;   /* #FFFDF7 */
+  --color-primary: 180 35 138;    /* #B4238A */
+  --color-secondary: 23 107 135;  /* #176B87 */
+  --color-accent:  107 122 32;    /* #6B7A20 */
+  --color-text:    33 26 46;      /* #211A2E */
+  --color-muted:   117 109 125;   /* #756D7D */
+  --color-border:  216 206 220;   /* #D8CEDC */
+  --color-success: 63 166 107;
+  --color-warning: 217 145 37;
+  --color-danger:  201 74 74;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--color-bg));
+  color: rgb(var(--color-text));
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar, tuned for both themes */
+::-webkit-scrollbar       { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-border));
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-muted)); }
+
+/* Focus visible ring uses primary */
+*:focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 2px;
+}
+
+/* Subtle grid background for the workbench */
+.workbench-grid {
+  background-image:
+    linear-gradient(rgb(var(--color-border) / 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--color-border) / 0.12) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
