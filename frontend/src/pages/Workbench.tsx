@@ -33,6 +33,7 @@ export function Workbench() {
   const [req, setReq] = useState<ExperimentRunRequest>(DEFAULT_REQUEST);
   const [result, setResult] = useState<ExperimentRunResponse | null>(null);
   const [running, setRunning] = useState(false);
+  const [loadingAttacks, setLoadingAttacks] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,10 +42,16 @@ export function Workbench() {
     api
       .listAttacks()
       .then((availableAttacks) => {
+        if (!Array.isArray(availableAttacks)) {
+          throw new Error("Unexpected response while loading attacks.");
+        }
         if (!cancelled) setAttacks(availableAttacks);
       })
       .catch((e) => {
         if (!cancelled) setError(String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAttacks(false);
       });
 
     return () => {
@@ -99,6 +106,7 @@ export function Workbench() {
             onChange={setReq}
             onRun={runExperiment}
             running={running}
+            loading={loadingAttacks}
           />
         </aside>
 

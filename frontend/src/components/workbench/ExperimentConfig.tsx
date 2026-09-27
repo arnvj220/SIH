@@ -11,6 +11,7 @@ interface Props {
   onChange: (v: ExperimentRunRequest) => void;
   onRun: () => void;
   running: boolean;
+  loading: boolean;
 }
 
 export function ExperimentConfig({
@@ -19,6 +20,7 @@ export function ExperimentConfig({
   onChange,
   onRun,
   running,
+  loading,
 }: Props) {
   const selectedAttack = attacks.find((a) => a.name === value.attack_type);
 
@@ -130,11 +132,11 @@ export function ExperimentConfig({
 
         <Button
           onClick={onRun}
-          disabled={running}
+          disabled={running || loading}
           className="w-full"
           variant="primary"
         >
-          {running ? "Running…" : "▶ Run Experiment"}
+          {loading ? "Loading attacks…" : running ? "Running…" : "▶ Run Experiment"}
         </Button>
 
         <div className="border-t border-border pt-3 text-[11px] text-muted">

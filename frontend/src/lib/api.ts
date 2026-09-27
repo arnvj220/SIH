@@ -1,9 +1,4 @@
-/**
- * Typed fetch wrapper for the QDS backend.
- *
- * Reads VITE_API_BASE from the environment. In dev, Vite proxies /api
- * to http://localhost:8000, so the default empty string works.
- */
+
 import type {
   Alert,
   AttackDescription,
