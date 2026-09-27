@@ -10,6 +10,7 @@ from .experiments import router as experiments_router
 from .metrics import router as metrics_router
 from .signatures import router as signatures_router
 from .verification import router as verification_router
+from .seed import router as seed_router
 
 router = APIRouter()
 
@@ -23,3 +24,4 @@ router.include_router(metrics_router)
 router.include_router(experiments_run_router)
 router.include_router(verifications_router)
 router.include_router(signatures_list_router)
+router.include_router(seed_router)

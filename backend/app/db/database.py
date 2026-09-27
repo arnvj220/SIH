@@ -1,42 +1,33 @@
-"""
-SQLAlchemy database configuration.
-"""
-
+"""MongoDB client and collection index configuration."""
 from __future__ import annotations
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase
+from pymongo import MongoClient
+from pymongo.database import Database
 
 from ..core.config import settings
 
 
-class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy ORM models."""
-
-    pass
-
-
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    future=True,
+client = MongoClient(
+    settings.MONGODB_URI,
+    connectTimeoutMS=5_000,
+    serverSelectionTimeoutMS=5_000,
 )
 
 
-def create_tables() -> None:
-    """
-    Create all database tables.
+def get_database() -> Database:
+    return client[settings.MONGODB_DATABASE]
 
-    Intended mainly for local development and smoke tests.
-    Production schema changes should be handled through Alembic.
-    """
-    # Import models so SQLAlchemy knows about them before create_all.
-    from .models import (  # noqa: F401
-        AlertModel,
-        AttackModel,
-        EventModel,
-        SignatureModel,
-        VerificationModel,
-    )
 
-    Base.metadata.create_all(bind=engine)
+def initialize_database(database: Database | None = None) -> None:
+    db = database if database is not None else get_database()
+    db["alerts"].create_index("alert_id", unique=True)
+    db["alerts"].create_index("created_at")
+    db["attacks"].create_index("attack_id", unique=True)
+    db["events"].create_index("event_id", unique=True)
+    db["events"].create_index("created_at")
+    db["experiment_runs"].create_index("experiment_id", unique=True)
+    db["experiment_runs"].create_index([("created_at", -1)])
+    db["signatures"].create_index("signature_id", unique=True)
+    db["signatures"].create_index([("created_at", -1)])
+    db["verifications"].create_index("verification_id", unique=True)
+    db["verifications"].create_index([("created_at", -1)])

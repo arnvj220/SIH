@@ -21,8 +21,9 @@ const config: Config = {
         danger:    "rgb(var(--color-danger) / <alpha-value>)",
       },
       fontFamily: {
-        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
-      },
+  sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+  mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+},
     },
   },
   plugins: [],

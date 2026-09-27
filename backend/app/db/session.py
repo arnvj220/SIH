@@ -1,32 +1,12 @@
-"""
-Database session management.
-"""
-
+"""FastAPI dependency providing the shared MongoDB database handle."""
 from __future__ import annotations
 
 from collections.abc import Generator
 
-from sqlalchemy.orm import Session, sessionmaker
+from pymongo.database import Database
 
-from .database import engine
-
-
-SessionLocal = sessionmaker(
-    bind=engine,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False,
-)
+from .database import get_database
 
 
-def get_db() -> Generator[Session, None, None]:
-    """
-    FastAPI dependency that provides a database session.
-    """
-
-    db = SessionLocal()
-
-    try:
-        yield db
-    finally:
-        db.close()
+def get_db() -> Generator[Database, None, None]:
+    yield get_database()

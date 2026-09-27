@@ -6,9 +6,8 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
-from ..db.models.event import EventModel
 from ..db.session import get_db
 
 
@@ -30,44 +29,41 @@ class EventResponse(BaseModel):
 
 
 @router.post("", response_model=EventResponse, status_code=201)
-def create_event(request: EventCreate, db: Session = Depends(get_db)) -> EventResponse:
-    row = EventModel(
-        event_id=f"evt_{uuid.uuid4().hex[:12]}",
-        event_type=request.event_type,
-        entity_type="manual",
-        entity_id=request.context_id,
-        severity="INFO",
-        payload=request.details,
-        created_at=datetime.now(timezone.utc),
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
+def create_event(request: EventCreate, db: Database = Depends(get_db)) -> EventResponse:
+    row = {
+        "event_id": f"evt_{uuid.uuid4().hex[:12]}",
+        "event_type": request.event_type,
+        "entity_type": "manual",
+        "entity_id": request.context_id,
+        "severity": "INFO",
+        "payload": request.details,
+        "created_at": datetime.now(timezone.utc),
+    }
+    db["events"].insert_one(row)
     return EventResponse(
-        event_id=row.event_id,
-        event_type=row.event_type,
-        context_id=row.entity_id,
-        details=row.payload,
-        created_at=row.created_at,
+        event_id=row["event_id"],
+        event_type=row["event_type"],
+        context_id=row["entity_id"],
+        details=row["payload"],
+        created_at=row["created_at"],
     )
 
 
 @router.get("", response_model=list[EventResponse])
-def list_events(db: Session = Depends(get_db)) -> list[EventResponse]:
-    rows = db.query(EventModel).order_by(EventModel.created_at.desc()).limit(500).all()
+def list_events(db: Database = Depends(get_db)) -> list[EventResponse]:
+    rows = db["events"].find().sort("created_at", -1).limit(500)
     return [
         EventResponse(
-            event_id=r.event_id,
-            event_type=r.event_type,
-            context_id=r.entity_id,
-            details=r.payload,
-            created_at=r.created_at,
+            event_id=row["event_id"],
+            event_type=row["event_type"],
+            context_id=row.get("entity_id"),
+            details=row.get("payload", {}),
+            created_at=row["created_at"],
         )
-        for r in rows
+        for row in rows
     ]
 
 
 @router.delete("", status_code=204)
-def clear_events(db: Session = Depends(get_db)) -> None:
-    db.query(EventModel).delete()
-    db.commit()
+def clear_events(db: Database = Depends(get_db)) -> None:
+    db["events"].delete_many({})

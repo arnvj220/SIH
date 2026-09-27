@@ -1,13 +1,4 @@
-"""
-Create all database tables.
-
-Run once after cloning the repo, or any time you add a new model:
-
-    cd backend
-    python scripts/init_db.py
-
-Safe to re-run — create_all only creates missing tables.
-"""
+"""Create MongoDB indexes used by the API."""
 from __future__ import annotations
 
 import sys
@@ -15,17 +6,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.db.database import Base, engine, create_tables
+from app.core.config import settings
+from app.db.database import get_database, initialize_database
 
 
 def main() -> None:
-    print("Creating tables on:", engine.url)
-    create_tables()
-    tables = sorted(Base.metadata.tables.keys())
-    print(f"Registered tables ({len(tables)}):")
-    for t in tables:
-        print(f"  - {t}")
-    print("Done.")
+    database = get_database()
+    initialize_database(database)
+    print(f"MongoDB database: {settings.MONGODB_DATABASE}")
+    print("Collections:")
+    for name in sorted(database.list_collection_names()):
+        print(f"  - {name}")
+    print("Indexes initialized.")
 
 
 if __name__ == "__main__":

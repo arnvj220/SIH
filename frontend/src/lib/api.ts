@@ -13,10 +13,12 @@ import type {
   ExperimentRunRequest,
   ExperimentRunResponse,
   SignatureSummary,
+  SignatureDetail,
   VerificationRequest,
   VerificationResponse,
   VerificationSummary,
 } from "./types";
+import { cached, invalidate } from "./cache";
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
@@ -61,50 +63,94 @@ function safeParse(text: string): unknown {
 }
 
 export const api = {
-  // Health
   health: () => request<{ status: string }>("GET", "/health"),
 
-  // Attacks
-  listAttacks: () => request<AttackDescription[]>("GET", "/api/attacks"),
+  listAttacks: () =>
+    cached("attacks", 60_000, () =>
+      request<AttackDescription[]>("GET", "/api/attacks")
+    ),
 
   executeAttack: (attack: AttackRequest, target: VerificationRequest) =>
     request<AttackResponse>("POST", "/api/attacks/execute", { attack, target }),
 
-  // Verification
   verify: (body: VerificationRequest) =>
     request<VerificationResponse>("POST", "/api/verification", body),
 
   listVerifications: () =>
-    request<VerificationSummary[]>("GET", "/api/verifications"),
+    cached("verifications", 15_000, () =>
+      request<VerificationSummary[]>("GET", "/api/verifications")
+    ),
 
-  // Signatures
   listSignatures: () =>
-    request<SignatureSummary[]>("GET", "/api/signatures"),
+    cached("signatures", 15_000, () =>
+      request<SignatureSummary[]>("GET", "/api/signatures")
+    ),
 
-  // Experiments
+  getSignature: (id: string) =>
+    request<SignatureDetail>("GET", `/api/signatures/${id}`),
+
   listExperiments: () =>
-    request<ExperimentRunResponse[]>("GET", "/api/experiments"),
+  cached("experiments", 15_000, () =>
+    request<ExperimentRunResponse[]>("GET", "/api/experiments")
+  ),
 
   getExperiment: (id: string) =>
     request<ExperimentRunResponse>("GET", `/api/experiments/${id}`),
 
   runExperiment: (body: ExperimentRunRequest) =>
-    request<ExperimentRunResponse>("POST", "/api/experiments/run", body),
+    request<ExperimentRunResponse>("POST", "/api/experiments/run", body).then(
+      (res) => {
+        invalidate("experiments");
+        return res;
+      }
+    ),
 
-  // Alerts
-  listAlerts: () => request<Alert[]>("GET", "/api/alerts"),
-  getAlert: (id: string) => request<Alert>("GET", `/api/alerts/${id}`),
+  listAlerts: () =>
+    cached("alerts", 15_000, () =>
+      request<Alert[]>("GET", "/api/alerts")
+    ),
+
+  getAlert: (id: string) =>
+    request<Alert>("GET", `/api/alerts/${id}`),
+
   resolveAlert: (id: string) =>
-    request<Alert>("POST", `/api/alerts/${id}/resolve`),
+    request<Alert>("POST", `/api/alerts/${id}/resolve`).then((res) => {
+      invalidate("alerts");
+      return res;
+    }),
 
-  // Events
-  listEvents: () => request<Event[]>("GET", "/api/events"),
+  listEvents: () =>
+    cached("events", 15_000, () =>
+      request<Event[]>("GET", "/api/events")
+    ),
+
   createEvent: (body: {
     event_type: string;
     context_id?: string | null;
     details?: Record<string, unknown>;
-  }) => request<Event>("POST", "/api/events", body),
-  clearEvents: () => request<void>("DELETE", "/api/events"),
+  }) =>
+    request<Event>("POST", "/api/events", body).then((res) => {
+      invalidate("events");
+      return res;
+    }),
+
+  clearEvents: () =>
+    request<void>("DELETE", "/api/events").then(() => invalidate("events")),
+
+  seedDemo: () =>
+    request<{
+      signatures_created: number;
+      verifications_created: number;
+      alerts_created: number;
+    }>("POST", "/api/seed/demo").then((res) => {
+      // Seed writes to every collection — bust every cached resource.
+      invalidate("signatures");
+      invalidate("verifications");
+      invalidate("alerts");
+      invalidate("events");
+      invalidate("experiments");
+      return res;
+    }),
 };
 
 export { ApiError };

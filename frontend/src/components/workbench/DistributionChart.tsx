@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -12,28 +13,47 @@ import { useTheme } from "../../theme/ThemeProvider";
 import { Card } from "../ui/Card";
 
 interface Props {
-  /** Per-basis error rates from the run: { X: 0.02, Y: 0.04, Z: 0.08 } */
   perBasisError: Record<string, number>;
   overallError: number;
+  runId?: string;
 }
 
-export function DistributionChart({ perBasisError, overallError }: Props) {
-  const { palette } = useTheme();
+interface Row {
+  basis: string;
+  error: number;
+  agreement: number;
+  prevError: number | null;
+}
 
-  const data = ["X", "Y", "Z"].map((b) => ({
-    basis: b,
-    error: perBasisError[b] ?? 0,
-    clean: 1 - (perBasisError[b] ?? 0),
-  }));
+export function DistributionChart({ perBasisError, overallError, runId }: Props) {
+  const { palette } = useTheme();
+  const prevRef = useRef<Record<string, number> | null>(null);
+  const [rows, setRows] = useState<Row[]>([]);
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    const next: Row[] = ["X", "Y", "Z"].map((b) => {
+      const err = perBasisError[b] ?? 0;
+      return {
+        basis: b,
+        error: err,
+        agreement: 1 - err,
+        prevError: prev?.[b] ?? null,
+      };
+    });
+    setRows(next);
+    // Store current as previous for the next render.
+    prevRef.current = { ...perBasisError };
+  }, [perBasisError, runId]);
 
   return (
     <Card
       title="Per-basis error distribution"
       subtitle={`Overall error rate: ${(overallError * 100).toFixed(2)}%`}
     >
-      <div className="h-64">
+      <div className="h-56 sm:h-64 md:h-72">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <BarChart data={rows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={palette.border} strokeDasharray="3 3" />
             <XAxis
               dataKey="basis"
@@ -57,8 +77,34 @@ export function DistributionChart({ perBasisError, overallError }: Props) {
               formatter={(value: number) => `${(value * 100).toFixed(2)}%`}
             />
             <Legend wrapperStyle={{ fontSize: 12, color: palette.muted }} />
-            <Bar dataKey="error" fill={palette.primary} name="Error rate" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="clean" fill={palette.secondary} name="Agreement" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="prevError"
+              name="Previous run"
+              fill={palette.muted}
+              fillOpacity={0.25}
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={true}
+              animationDuration={400}
+            />
+            <Bar
+              dataKey="error"
+              name="Error rate"
+              fill={palette.primary}
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={true}
+              animationDuration={600}
+              animationEasing="ease-out"
+            />
+            <Bar
+              dataKey="agreement"
+              name="Agreement"
+              fill={palette.secondary}
+              fillOpacity={0.7}
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={true}
+              animationDuration={600}
+              animationEasing="ease-out"
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

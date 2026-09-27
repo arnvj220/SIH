@@ -20,7 +20,7 @@ print("=" * 72)
 print("HTTP probes against the running app (TestClient with lifespan)")
 print("=" * 72)
 
-with TestClient(app) as client:          # ← triggers startup → create_tables
+with TestClient(app) as client:          # triggers startup → ensure MongoDB indexes
     for method, path, body in PROBES:
         r = client.request(method, path, json=body)
         marker = "OK  " if r.status_code < 500 else "FAIL"

@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-import numpy as np
-from fastapi import APIRouter, HTTPException
+from datetime import datetime, timezone
 
+import numpy as np
+from fastapi import APIRouter, Depends, HTTPException
+from pymongo.database import Database
+from pymongo.errors import DuplicateKeyError
+
+from ..db.session import get_db
 from ..models.schemas.signature import SignatureCreate, SignatureResponse
 from ..services.signature_service import SignatureRequest, SignatureService
 
@@ -68,6 +73,7 @@ def _evidence_to_response(evidence):
 )
 def create_signature(
     request: SignatureCreate,
+    db: Database = Depends(get_db),
 ) -> SignatureResponse:
     try:
         state = _state_from_schema(request.input_state)
@@ -89,6 +95,25 @@ def create_signature(
             detail=str(exc),
         ) from exc
 
+    evidence = _evidence_to_response(signature.quantum_evidence)
+    created_at = datetime.now(timezone.utc)
+    try:
+        db["signatures"].insert_one(
+            {
+                "signature_id": signature.signature_id,
+                "signer_id": signature.signer_id,
+                "message_id": signature.message_id,
+                "message_digest": signature.message_digest,
+                "protocol_version": signature.protocol_version,
+                "session_id": signature.session_id,
+                "quantum_evidence": evidence,
+                "metadata_json": {},
+                "created_at": created_at,
+            }
+        )
+    except DuplicateKeyError as exc:
+        raise HTTPException(status_code=409, detail="Signature already exists.") from exc
+
     return SignatureResponse(
         signature_id=signature.signature_id,
         signer_id=signature.signer_id,
@@ -96,7 +121,6 @@ def create_signature(
         protocol_version=signature.protocol_version,
         session_id=signature.session_id,
         message_digest=signature.message_digest,
-        quantum_evidence=_evidence_to_response(
-            signature.quantum_evidence
-        ),
+        quantum_evidence=evidence,
+        created_at=created_at,
     )

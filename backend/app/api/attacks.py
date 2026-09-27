@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from ..attacks.contracts import VerificationContext
-from ..db.models.attack import AttackModel
 from ..db.session import get_db
 from ..models.schemas.attack import (
     AttackDescription,
@@ -62,7 +61,7 @@ def list_attacks() -> list[AttackDescription]:
 def execute_attack(
     attack: AttackRequest,
     target: VerificationRequest,
-    db: Session = Depends(get_db),
+    db: Database = Depends(get_db),
 ) -> AttackResponse:
     try:
         context = _ctx_from_schema(target)
@@ -107,22 +106,20 @@ def execute_attack(
 
     # Persist the attack run.
     try:
-        db.add(
-            AttackModel(
-                attack_id=attack.attack_id,
-                attack_type=attack.attack_type,
-                scenario_name=attack.attack_type,
-                seed=attack.seed,
-                parameters=attack.parameters,
-                target_context_id=context.context_id,
-                generated_samples=detection_summary,
-                evidence={},
-            )
+        db["attacks"].insert_one(
+            {
+                "attack_id": attack.attack_id,
+                "attack_type": attack.attack_type,
+                "scenario_name": attack.attack_type,
+                "seed": attack.seed,
+                "parameters": attack.parameters,
+                "target_context_id": context.context_id,
+                "generated_samples": detection_summary,
+                "evidence": {},
+            }
         )
-        db.commit()
     except Exception as exc:
         print(f"[attacks] persist failed: {exc}")
-        db.rollback()
 
     return AttackResponse(
         attack_id=attack.attack_id,

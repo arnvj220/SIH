@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from ..attacks.contracts import MeasurementRound, VerificationContext
 from ..db.session import get_db
@@ -52,7 +52,7 @@ def _build_context(request: VerificationRequest) -> VerificationContext:
 @router.post("", response_model=VerificationResponse)
 def verify_signature(
     request: VerificationRequest,
-    db: Session = Depends(get_db),
+    db: Database = Depends(get_db),
 ) -> VerificationResponse:
     context = _build_context(request)
     outcome = detection_service.detect(context)

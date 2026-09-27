@@ -1,31 +1,45 @@
 """GET /api/signatures - list signatures."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException
+from pymongo.database import Database
 
-from ..db.models.signature import SignatureModel
 from ..db.session import get_db
 
 router = APIRouter(prefix="/signatures", tags=["signatures"])
 
 
 @router.get("")
-def list_signatures(db: Session = Depends(get_db)) -> list[dict]:
-    rows = (
-        db.query(SignatureModel)
-        .order_by(SignatureModel.created_at.desc())
-        .limit(500)
-        .all()
-    )
+def list_signatures(db: Database = Depends(get_db)) -> list[dict]:
+    rows = db["signatures"].find().sort("created_at", -1).limit(500)
     return [
         {
-            "signature_id": getattr(r, "signature_id", None) or getattr(r, "id", None),
-            "signer_id": getattr(r, "signer_id", None),
-            "message_id": getattr(r, "message_id", None),
-            "session_id": getattr(r, "session_id", None),
-            "protocol_version": getattr(r, "protocol_version", None),
-            "created_at": getattr(r, "created_at", None),
+            "signature_id": row.get("signature_id"),
+            "signer_id": row.get("signer_id"),
+            "message_id": row.get("message_id"),
+            "session_id": row.get("session_id"),
+            "protocol_version": row.get("protocol_version"),
+            "created_at": row.get("created_at"),
         }
-        for r in rows
+        for row in rows
     ]
+
+
+@router.get("/{signature_id}")
+def get_signature(signature_id: str, db: Database = Depends(get_db)) -> dict:
+    row = db["signatures"].find_one(
+        {"signature_id": signature_id},
+        {"_id": 0},
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Signature not found.")
+    return {
+        "signature_id": row.get("signature_id"),
+        "signer_id": row.get("signer_id"),
+        "message_id": row.get("message_id"),
+        "message_digest": row.get("message_digest"),
+        "session_id": row.get("session_id"),
+        "protocol_version": row.get("protocol_version"),
+        "created_at": row.get("created_at"),
+        "quantum_evidence": row.get("quantum_evidence", {}),
+    }

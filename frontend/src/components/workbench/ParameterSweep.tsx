@@ -89,7 +89,7 @@ export function ParameterSweep({
           Runs the attack at {sweepKey} = 5%, 10%, 20%, 30%.
         </div>
       ) : (
-        <div className="h-56">
+        <div className="h-48 sm:h-56">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid stroke={palette.border} strokeDasharray="3 3" />
@@ -116,12 +116,15 @@ export function ParameterSweep({
                 formatter={(value: number) => `${(value * 100).toFixed(1)}%`}
               />
               <Line
-                type="monotone"
-                dataKey="detection"
-                stroke={palette.accent}
-                strokeWidth={2}
-                dot={{ r: 4, fill: palette.accent }}
-              />
+  type="monotone"
+  dataKey="detection"
+  stroke={palette.accent}
+  strokeWidth={2}
+  dot={{ r: 4, fill: palette.accent }}
+  isAnimationActive={true}
+  animationDuration={500}
+  animationEasing="ease-out"
+/>
             </LineChart>
           </ResponsiveContainer>
         </div>

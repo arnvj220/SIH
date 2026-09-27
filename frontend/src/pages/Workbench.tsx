@@ -16,6 +16,8 @@ import type {
   ExperimentRunResponse,
 } from "../lib/types";
 import { sanitizeParamsForAttack } from "../lib/attackParams";
+import { SampleInspector } from "../components/workbench/SampleInspector";
+import { Page } from "../components/layout/Page";
 
 const DEFAULT_REQUEST: ExperimentRunRequest = {
   attack_type: "channel_manipulation",
@@ -34,27 +36,37 @@ export function Workbench() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     api
       .listAttacks()
-      .then(setAttacks)
-      .catch((e) => setError(String(e)));
+      .then((availableAttacks) => {
+        if (!cancelled) setAttacks(availableAttacks);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const runExperiment = async () => {
-  setRunning(true);
-  setError(null);
-  try {
-    const res = await api.runExperiment({
-      ...req,
-      parameters: sanitizeParamsForAttack(attacks, req.attack_type, req.parameters),
-    });
-    setResult(res);
-  } catch (e) {
-    setError(String(e));
-  } finally {
-    setRunning(false);
-  }
-};
+    setRunning(true);
+    setError(null);
+    try {
+      const res = await api.runExperiment({
+        ...req,
+        parameters: sanitizeParamsForAttack(attacks, req.attack_type, req.parameters),
+      });
+      setResult(res);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const metrics = result?.metrics ?? {};
   const detectionRate = Number(metrics.detection_rate ?? 0);
@@ -68,73 +80,72 @@ export function Workbench() {
   };
 
   return (
-    <div className="workbench-grid min-h-full">
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <header className="mb-6">
-          <h1 className="text-xl font-semibold text-text">
-            QDS Threat Analysis Workbench
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Configure, run, and inspect a QDS attack experiment against the
-            real detection engine.
-          </p>
-        </header>
-
-        {error && (
-          <div className="mb-4 rounded-md border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
-          <aside className="space-y-6">
-            <ExperimentConfig
-              attacks={attacks}
-              value={req}
-              onChange={setReq}
-              onRun={runExperiment}
-              running={running}
-            />
-          </aside>
-
-          <section className="space-y-6">
-            {!result ? (
-              <Empty
-                title="No run yet"
-                hint="Configure the experiment on the left and press Run Experiment."
-              />
-            ) : (
-              <>
-                <Card title="Run summary" subtitle={result.experiment_id}>
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <Stat label="Detection" value={pct(detectionRate)} tone="success" />
-                    <Stat label="False positive" value={pct(falsePositive)} tone="warning" />
-                    <Stat label="Attack mean err" value={pct(attackMean)} />
-                    <Stat label="Benign mean err" value={pct(benignMean)} />
-                  </div>
-                </Card>
-
-                <DistributionChart perBasisError={perBasis} overallError={attackMean} />
-                <DeviationPanel metrics={metrics} />
-                <DecisionPanel
-                  decision={detectionRate > 0 ? "REJECT" : "ACCEPT"}
-                  threats={
-                    detectionRate > 0
-                      ? [(result.config as { attack_type?: string }).attack_type ?? ""].filter(Boolean)
-                      : []
-                  }
-                />
-              </>
-            )}
-
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              <ParameterSweep attackType={req.attack_type} attacks={attacks} />
-<ShotsSweep attackType={req.attack_type} />
-            </div>
-          </section>
+    <Page
+      title="Workbench"
+      subtitle="Configure, run, and inspect a QDS attack experiment against the real detection engine."
+      grid
+    >
+      {error && (
+        <div className="mb-4 rounded-md border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
+          {error}
         </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside className="space-y-6">
+          <ExperimentConfig
+            attacks={attacks}
+            value={req}
+            onChange={setReq}
+            onRun={runExperiment}
+            running={running}
+          />
+        </aside>
+
+        <section className="space-y-6">
+          {!result ? (
+            <Empty
+              title="No run yet"
+              hint="Configure the experiment on the left and press Run Experiment."
+            />
+          ) : (
+            <>
+              <Card title="Run summary" subtitle={result.experiment_id}>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
+                  <Stat label="Detection" value={pct(detectionRate)} tone="success" />
+                  <Stat label="False positive" value={pct(falsePositive)} tone="warning" />
+                  <Stat label="Attack mean err" value={pct(attackMean)} />
+                  <Stat label="Benign mean err" value={pct(benignMean)} />
+                </div>
+              </Card>
+
+              <DistributionChart
+                perBasisError={perBasis}
+                overallError={attackMean}
+                runId={result.experiment_id}
+              />
+              <DeviationPanel metrics={metrics} />
+              <SampleInspector
+                attackEvidence={result.attack_evidence}
+              />
+              <DecisionPanel
+                decision={detectionRate > 0 ? "REJECT" : "ACCEPT"}
+                threats={
+                  detectionRate > 0
+                    ? [(result.config as { attack_type?: string }).attack_type ?? ""].filter(Boolean)
+                    : []
+                }
+              />
+            </>
+          )}
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <ParameterSweep attackType={req.attack_type} attacks={attacks} />
+            <ShotsSweep attackType={req.attack_type} />
+          </div>
+        </section>
       </div>
-    </div>
+    </Page>
   );
 }
 

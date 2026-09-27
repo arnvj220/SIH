@@ -3,9 +3,37 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.db.database import get_database
 
 
 client = TestClient(app)
+
+
+def test_get_signature_details_returns_persisted_signing_evidence():
+    get_database()["signatures"].insert_one(
+        {
+            "signature_id": "sig_details",
+            "signer_id": "usr_alice",
+            "message_id": "msg_details",
+            "message_digest": "a" * 64,
+            "session_id": "sess_details",
+            "protocol_version": "qds-v1",
+            "created_at": "2026-01-01T00:00:00Z",
+            "quantum_evidence": {
+                "measurement_bits": "01",
+                "correction_bits": "01",
+                "correction_operator": "X",
+                "seed": 42,
+            },
+        }
+    )
+
+    response = client.get("/api/signatures/sig_details")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message_digest"] == "a" * 64
+    assert data["quantum_evidence"]["correction_operator"] == "X"
 
 
 def test_create_signature():

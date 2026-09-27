@@ -6,7 +6,7 @@ export function ThemeToggle() {
     <button
       onClick={toggle}
       title={`Switch to ${mode === "dark" ? "light" : "dark"} mode`}
-      className="flex items-center gap-2 rounded-md border border-border bg-bg px-3 py-1.5 text-xs text-muted hover:text-text"
+      className="flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1 text-[11px] text-muted hover:text-text"
     >
       <span aria-hidden>{mode === "dark" ? "☾" : "☀"}</span>
       <span>{mode === "dark" ? "Eclipse" : "Ivory"}</span>

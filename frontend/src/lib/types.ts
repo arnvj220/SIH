@@ -100,6 +100,7 @@ export interface ExperimentRunResponse {
   config: Record<string, unknown>;
   metrics: Record<string, unknown>;
   attack_evidence: Record<string, unknown>;
+  created_at?: string | null;
 }
 
 // ── Alerts ──────────────────────────────────────────────────────────
@@ -137,6 +138,11 @@ export interface SignatureSummary {
   session_id: string;
   protocol_version: string | null;
   created_at: string | null;
+}
+
+export interface SignatureDetail extends SignatureSummary {
+  message_digest: string | null;
+  quantum_evidence: Record<string, unknown>;
 }
 
 export interface VerificationSummary {
