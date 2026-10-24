@@ -1,0 +1,78 @@
+
+name: Render Backend Keep-Alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Check backend and record report
+        shell: bash
+        env:
+          TARGET_URL: https://sih-grh0.onrender.com/api/attacks
+        run: |
+          mkdir -p reports
+
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          REPORT="reports/backend-report.txt"
+          RESPONSE="reports/response-body.txt"
+
+          START=$(date +%s)
+
+          HTTP_CODE=$(curl -L -sS \
+            --max-time 90 \
+            -o "$RESPONSE" \
+            -w "%{http_code}" \
+            "$TARGET_URL") || CURL_EXIT=$?
+
+          CURL_EXIT=${CURL_EXIT:-0}
+          END=$(date +%s)
+          DURATION=$((END - START))
+
+          if [ "$CURL_EXIT" -eq 0 ] &&
+             [ "$HTTP_CODE" -ge 200 ] &&
+             [ "$HTTP_CODE" -lt 400 ]; then
+            STATUS="SUCCESS"
+          else
+            STATUS="FAILED"
+          fi
+
+          {
+            echo "Timestamp (UTC): $TIMESTAMP"
+            echo "URL: $TARGET_URL"
+            echo "Status: $STATUS"
+            echo "HTTP Code: ${HTTP_CODE:-000}"
+            echo "Curl Exit Code: $CURL_EXIT"
+            echo "Response Time: ${DURATION}s"
+            echo "-----------------------------------"
+          } | tee "$REPORT"
+
+          echo "### Backend Check Report" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Time (UTC):** $TIMESTAMP" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Status:** $STATUS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **HTTP Code:** ${HTTP_CODE:-000}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Response time:** ${DURATION}s" >> "$GITHUB_STEP_SUMMARY"
+
+          # Avoid failing the job before the report can be uploaded.
+          if [ "$STATUS" != "SUCCESS" ]; then
+            echo "Backend check failed; see report artifact."
+          fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-backend-report
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30
