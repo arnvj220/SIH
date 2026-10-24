@@ -1,9 +1,9 @@
-
 name: Render Backend Keep-Alive
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # Changed to 15 mins to align better with Render timeouts and GitHub's scheduler
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -38,9 +38,8 @@ jobs:
           END=$(date +%s)
           DURATION=$((END - START))
 
-          if [ "$CURL_EXIT" -eq 0 ] &&
-             [ "$HTTP_CODE" -ge 200 ] &&
-             [ "$HTTP_CODE" -lt 400 ]; then
+          # Treat 401 Unauthorized as a success since the server is awake and responding
+          if [ "$CURL_EXIT" -eq 0 ] && [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 500 ]; then
             STATUS="SUCCESS"
           else
             STATUS="FAILED"
@@ -63,9 +62,10 @@ jobs:
           echo "- **HTTP Code:** ${HTTP_CODE:-000}" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Response time:** ${DURATION}s" >> "$GITHUB_STEP_SUMMARY"
 
-          # Avoid failing the job before the report can be uploaded.
+          # Explicitly fail the step if the status is FAILED
           if [ "$STATUS" != "SUCCESS" ]; then
             echo "Backend check failed; see report artifact."
+            exit 1
           fi
 
       - name: Upload report
